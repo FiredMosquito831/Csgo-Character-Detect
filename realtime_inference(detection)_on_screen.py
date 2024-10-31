@@ -4,11 +4,17 @@ import mss
 from PyQt5 import QtCore, QtGui, QtWidgets
 import torch
 import keyboard
+import ctypes
 import time
 from PyQt5.QtCore import QThread, pyqtSignal
 from ultralytics import YOLO
 
 # Define constants for mouse input simulation
+PUL = ctypes.POINTER(ctypes.c_ulong)
+MOUSE_LEFTDOWN = 0x0002
+MOUSE_LEFTUP = 0x0004
+MOUSEEVENTF_MOVE = 0x0001
+
 confidence = 0.45
 frame_skip = 1
 
@@ -16,7 +22,26 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Running on {device}")
 
 # Load your trained YOLO model
-model = YOLO('../GtaModels/S45images/train4/weights/best.engine') # current best
+model = YOLO('C:\\Users\\fgghk\\PycharmProjects\\TranscriptionAppRelease\\CsgoAiDetectCharacters\\runs\\CurrentBEST\\train2\\weights\\best.pt').to(device)
+
+# model = YOLO('../GtaModels/S149ImagesV310epochs/train/weights/best.engine')
+
+
+class MouseInput(ctypes.Structure):
+    _fields_ = [("dx", ctypes.c_long),
+                ("dy", ctypes.c_long),
+                ("mouseData", ctypes.c_ulong),
+                ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong),
+                ("dwExtraInfo", PUL)]
+
+class Input_I(ctypes.Union):
+    _fields_ = [("mi", MouseInput)]
+
+class Input(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_ulong),
+                ("ii", Input_I)]
+
 
 class DetectionThread(QThread):
     update_overlay_signal = pyqtSignal(np.ndarray)
@@ -57,6 +82,8 @@ class DetectionThread(QThread):
     def process_detections(self, results):
         """Process YOLO results and create overlay image."""
         overlay_img = np.zeros((480, 640, 3), dtype=np.uint8)
+        screen_center_x = 320  # Center x for 640 width
+        screen_center_y = 240  # Center y for 480 height
 
         for result in results:
             for box in result.boxes:
@@ -67,6 +94,8 @@ class DetectionThread(QThread):
                 cv2.rectangle(overlay_img, (x1, y1), (x2, y2), (125, 255, 35), 2)
                 label = f'{conf_score:.2f}'
                 cv2.putText(overlay_img, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+
+                
 
         return overlay_img
 
